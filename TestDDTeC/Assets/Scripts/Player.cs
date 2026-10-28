@@ -14,16 +14,19 @@ public class Player : MonoBehaviour
     [SerializeField] private Transform visual;
 
     private Rigidbody body;
+    private RigidbodyConstraints originalConstraints;
     private InputAction moveAction;
     private InputAction jumpAction;
     private Vector3 originalScale;
     private Vector2 moveInput;
     private float chargeTimer;
     private bool isGrounded;
+    private bool launchPending;
 
     private void Awake()
     {
         body = GetComponent<Rigidbody>();
+        originalConstraints = body.constraints;
 
         if (visual == null && transform.childCount > 0)
         {
@@ -95,7 +98,7 @@ public class Player : MonoBehaviour
         }
         else if (isGrounded && chargeTimer > 0f && jumpAction.WasReleasedThisFrame())
         {
-            Launch();
+            launchPending = true;
         }
 
         UpdateCompression();
@@ -103,6 +106,12 @@ public class Player : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (launchPending)
+        {
+            Launch();
+            return;
+        }
+
         if (isGrounded || moveInput.sqrMagnitude == 0f || airControl == 0f)
         {
             return;
@@ -139,15 +148,16 @@ public class Player : MonoBehaviour
         chargeTimer = 0f;
         body.linearVelocity = Vector3.zero;
         body.angularVelocity = Vector3.zero;
-        body.isKinematic = true;
+        body.constraints = originalConstraints | RigidbodyConstraints.FreezeAll;
     }
 
     private void Launch()
     {
         float chargeRatio = chargeTimer / chargeTime;
         chargeTimer = 0f;
+        launchPending = false;
         isGrounded = false;
-        body.isKinematic = false;
+        body.constraints = originalConstraints;
         body.linearVelocity = Vector3.zero;
         body.angularVelocity = Vector3.zero;
         body.AddForce(Vector3.up * (jumpForce + maxChargeBonus * chargeRatio), ForceMode.Impulse);
